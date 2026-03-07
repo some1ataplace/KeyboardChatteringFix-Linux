@@ -25,8 +25,16 @@ def _from_keystroke(event: libevdev.InputEvent, threshold: int) -> bool:
     if event.matches(libevdev.EV_SYN) or event.matches(libevdev.EV_MSC):
         return False
 
+    # filtering keys that are held down for combinations disable said combination from working (i.e. shift+d for D)
+    blacklist = event.matches(libevdev.EV_KEY.KEY_RIGHTALT) or\
+        event.matches(libevdev.EV_KEY.KEY_LEFTALT) or\
+        event.matches(libevdev.EV_KEY.KEY_RIGHTSHIFT) or\
+        event.matches(libevdev.EV_KEY.KEY_LEFTSHIFT) or\
+        event.matches(libevdev.EV_KEY.KEY_RIGHTCTRL) or\
+        event.matches(libevdev.EV_KEY.KEY_LEFTCTRL)
+
     # some events we don't want to filter, like EV_LED for toggling NumLock and the like, and also key hold events
-    if not event.matches(libevdev.EV_KEY) or event.value > 1:
+    if blacklist or not event.matches(libevdev.EV_KEY) or event.value > 1:
         logging.debug(f'FORWARDING {event.code}')
         return True
 
