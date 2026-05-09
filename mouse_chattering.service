@@ -1,9 +1,9 @@
 [Unit]
-Description=Mouse Chattering Fix service
+Description=Mouse Chattering service
 
 [Service]
-# Change ExecStart to the absolute path of the file, executing mouse_fix.sh
-ExecStart=<absolute/path/to/file/mouse_fix.sh>
+# Change ExecStart to the absolute path of the file, executing mouse_chattering.sh
+ExecStart=<absolute/path/to/file/mouse_chattering.sh>
 
 Restart=always
 RestartSec=5
