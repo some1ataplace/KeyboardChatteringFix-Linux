@@ -8,6 +8,7 @@ import libevdev
 from src.mouse_filtering import filter_mouse_chattering
 from src.mouse_retrieval import retrieve_mouse_name, INPUT_DEVICES_PATH, abs_mouse_path
 
+# Safely import the config file if it exists
 try:
     from src.mouse_config import FILTERED_BUTTONS
 except ImportError:
@@ -16,6 +17,8 @@ except ImportError:
 @contextmanager
 def get_device_handle(mouse_name: str) -> libevdev.Device:
     device_path = abs_mouse_path(mouse_name)
+    
+    # DISCONNECT FIX: Prevent 100% CPU exhaustion loop if mouse is turned off/unplugged.
     if not os.path.exists(device_path):
         logging.critical(f"Mouse {mouse_name} not connected. Exiting to prevent CPU loop.")
         sys.exit(0)
@@ -28,6 +31,7 @@ def get_device_handle(mouse_name: str) -> libevdev.Device:
         fd.close()
 
 def parse_buttons(buttons_str):
+    """Parses comma-separated CLI arguments into a list of strings."""
     if not buttons_str: return []
     return [btn.strip() for btn in buttons_str.split(',')]
     
@@ -43,9 +47,11 @@ if __name__ == "__main__":
                         handlers=[logging.StreamHandler(sys.stdout)],
                         format="%(asctime)s - %(message)s", datefmt="%H:%M:%S")
 
+    # CONFIG PRECEDENCE: CLI args > mouse_config.py > Empty (Filter All)
     buttons_list = args.buttons if args.buttons else list(FILTERED_BUTTONS)
     buttons_to_filter = []
     
+    # Convert string button names (e.g., "BTN_LEFT") to libevdev.EventCode objects
     for btn in buttons_list:
         try:
             buttons_to_filter.append(libevdev.evbit(btn))
