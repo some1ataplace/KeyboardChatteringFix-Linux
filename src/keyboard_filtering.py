@@ -3,7 +3,7 @@ from collections import defaultdict
 from typing import DefaultDict, Dict, NoReturn, List
 import time
 import libevdev
-
+import sys
 
 def filter_chattering(evdev: libevdev.Device, threshold: int, keys_to_filter: List[libevdev.EventCode] = None) -> NoReturn:
     # Delay to allow the Enter key (used to execute the terminal command) 
