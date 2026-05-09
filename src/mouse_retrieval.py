@@ -6,13 +6,11 @@ INPUT_DEVICES_PATH: Final = '/dev/input/by-id'
 
 def retrieve_mouse_name() -> str:
     all_devices = os.listdir(INPUT_DEVICES_PATH)
-    
-    # Filter only for mouse devices
     mouse_devices = list(set([d for d in all_devices if 'event-mouse' in d]))
     n_devices = len(mouse_devices)
 
     if n_devices == 0:
-        raise ValueError(f"Couldn't find a mouse ending with 'event-mouse' in '{INPUT_DEVICES_PATH}'. You may need to provide it manually using -m.")
+        raise ValueError(f"Couldn't find a mouse ending with 'event-mouse'. Please provide it manually with -m.")
 
     if n_devices == 1:
         logging.info(f"Found mouse: {mouse_devices[0]}")
