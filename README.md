@@ -50,6 +50,19 @@ Download the repository and extract the files. The dependencies are listed in `r
 sudo pip3 install -r requirements.txt --break-system-packages
 ```
 
+### Python Virtual Environment
+Using the built-in `venv` module is the safest and cleanest way to run this tool.
+```shell
+# 1. Create a virtual environment named 'venv' inside the project folder
+python3 -m venv venv
+
+# 2. Activate the virtual environment
+source venv/bin/activate
+
+# 3. Install the dependencies inside the isolated environment
+pip install -r requirements.txt
+```
+
 ## Usage
 
 `cd` inside the location of the extracted folder. Because keyboards and mice are handled differently by the OS, they are executed as separate modules. Enter the commands below to run them manually:
