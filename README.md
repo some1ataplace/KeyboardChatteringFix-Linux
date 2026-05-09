@@ -167,4 +167,4 @@ systemctl status mouse_chattering.service
 journalctl -xeu mouse_chattering.service
 ```
 
-*(Note: If your device disconnects, is unplugged, or goes to sleep, the service will safely pause and wait for it to reconnect without crashing or consuming CPU).*
+*(Note: If your device disconnects, is unplugged, or goes to sleep, the Python script will gracefully exit. Systemd will then safely attempt to restart it every 5 seconds in the background until the device is reconnected, ensuring 0% CPU waste!)*
