@@ -1,14 +1,11 @@
 import logging
 import os
-from typing import Final, List
+from typing import Final
 
 INPUT_DEVICES_PATH: Final = '/dev/input/by-id'
 
 def retrieve_keyboard_name() -> str:
-    # List all devices in the directory
     all_devices = os.listdir(INPUT_DEVICES_PATH)
-    
-    # Remove duplicates just in case
     keyboard_devices = list(set(all_devices))
     n_devices = len(keyboard_devices)
 
@@ -19,8 +16,7 @@ def retrieve_keyboard_name() -> str:
         logging.info(f"Found keyboard: {keyboard_devices[0]}")
         return keyboard_devices[0]
 
-    # Use native Python input for user selection
-    print("Select a device:")
+    print("Select a keyboard device:")
     for idx, device in enumerate(sorted(keyboard_devices), start=1):
         print(f"{idx}. {device}")
 
