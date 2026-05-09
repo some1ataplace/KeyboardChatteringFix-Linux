@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Final
+from typing import Final, List
 
 INPUT_DEVICES_PATH: Final = '/dev/input/by-id'
 

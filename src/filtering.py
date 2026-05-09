@@ -4,7 +4,7 @@ from typing import DefaultDict, Dict, NoReturn, List
 import time
 
 import libevdev
-
+import time
 
 def filter_chattering(evdev: libevdev.Device, threshold: int, keys_to_filter: List[libevdev.EventCode] = None) -> NoReturn:
     # Add delay to allow the Enter key to release after executing the script via terminal
