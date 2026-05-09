@@ -23,9 +23,17 @@ def filter_chattering(evdev: libevdev.Device, threshold: int, keys_to_filter: Li
 
     while True:
         # Descriptor is blocking; waits until physical events are available
-        for e in evdev.events():
-            if _from_keystroke(e, threshold, keys_to_filter):
-                ui_dev.send_events([e, libevdev.InputEvent(libevdev.EV_SYN.SYN_REPORT, 0)])
+        try:
+            for e in evdev.events():
+                if _from_keystroke(e, threshold, keys_to_filter):
+                    ui_dev.send_events([e, libevdev.InputEvent(libevdev.EV_SYN.SYN_REPORT, 0)])
+        except OSError as err:
+            # Errno 19 means "No such device". This happens if the USB is suddenly unplugged.
+            if err.errno == 19:
+                logging.critical("Keyboard disconnected while listening. Exiting gracefully.")
+                sys.exit(0)
+            else:
+                raise err
 
 
 def _from_keystroke(event: libevdev.InputEvent, threshold: int, keys_to_filter: List[libevdev.EventCode]) -> bool:
