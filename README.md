@@ -100,9 +100,14 @@ chmod +x keyboard_chattering.sh mouse_chattering.sh
 ### Step 2: Configure the service files
 Edit `keyboard_chattering.service` and `mouse_chattering.service`. The `ExecStart` should be the absolute path of the respective `.sh` file. 
 
-**Example:**
+**Example keyboard_chattering.service:**
 ```shell
 ExecStart=/home/foouser/Downloads/HardwareChatteringFix-Linux/keyboard_chattering.sh
+```
+
+**Example mouse_chattering.service:**
+```shell
+ExecStart=/home/foouser/Downloads/HardwareChatteringFix-Linux/mouse_chattering.sh
 ```
 
 ### Step 3: Enable the Services (Separately or Combined)
