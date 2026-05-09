@@ -47,14 +47,14 @@ Download the repository and extract the files. The dependencies are listed in `r
 *(Note: According to PEP 668, newer Linux distributions may require the `--break-system-packages` flag, or the use of a python `venv`)*.
 
 ```shell
-sudo pip3 install -r requirements.txt --break-system-packages
+sudo pip install -r requirements.txt --break-system-packages
 ```
 
 ### Python Virtual Environment
 Using the built-in `venv` module is the safest and cleanest way to run this tool.
 ```shell
 # 1. Create a virtual environment named 'venv' inside the project folder
-python3 -m venv venv
+python -m venv venv
 
 # 2. Activate the virtual environment
 source venv/bin/activate
@@ -69,12 +69,12 @@ pip install -r requirements.txt
 
 **To run the Keyboard fix:**
 ```shell
-sudo python3 -m src.keyboard_main
+sudo python -m src.keyboard_main
 ```
 
 **To run the Mouse fix:**
 ```shell
-sudo python3 -m src.mouse_main
+sudo python -m src.mouse_main
 ```
 
 ### Customization Options
