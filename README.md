@@ -24,6 +24,19 @@ This also means it works across the whole system, without depending on X11 or Wa
 
 As for the filtering rule, what seems to work well is the time between the last "key up" event and the current "key down" event. When the switch chatters, that time is very low - around 10 ms. By filtering such anomalies, we remove chatter without impeding actual fast typing or clicking.
 
+### Understanding Linux Input Devices (Which one do I pick?)
+
+Modern gaming peripherals (like Corsair, Razer, or Logitech) are "composite USB devices". This means a single physical mouse might tell Linux it is actually 4 different devices! When you run the scripts manually, you will see a list of endpoints ending in different suffixes. 
+
+Here is a guide on which one to choose:
+
+- **`-event-kbd`**: The primary endpoint for standard keystrokes. For keyboards, select this to fix chattering on standard keys (A-Z, 0-9). 
+- **`-event-mouse`**: The primary endpoint for standard mouse clicks (Left, Right, Middle) and X/Y movement. Select this to fix standard mouse double-clicking.
+- **`-ifXX-event-kbd` (Virtual Mouse Keyboards)**: Advanced gaming mice often register a "virtual keyboard" to handle macro side-buttons. If your mouse's side buttons are double-clicking, you may need to point the mouse script at this endpoint instead of the standard mouse endpoint!
+- **`-event-ifXX` (Interfaces)**: These handle multimedia controls (Volume wheels, Play/Pause) or vendor-specific data (RGB lighting). You rarely need to select these unless your volume wheel is bouncing.
+
+*Note: Legacy raw nodes (like those ending simply in `-mouse` or `-kbd` without the word `event`) are legacy X11 nodes and cannot be read by `libevdev`.*
+
 ## Installation
 
 Download the repository and extract the files. The dependencies are listed in `requirements.txt`. You can install them with the command below. 
