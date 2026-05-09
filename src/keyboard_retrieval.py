@@ -12,6 +12,11 @@ def retrieve_keyboard_name() -> str:
     Lists all devices in the input directory and prompts the user to select one.
     This is triggered when the script is run without the `-k` argument.
     """
+
+    # Filter to ONLY show valid modern event nodes. This safely hides legacy raw nodes (like '-mouse' or '-kbd') which would crash libevdev, but keeps all virtual '-event-kbd' and '-event-mouse' nodes visible.
+    #valid_devices = [d for d in all_devices if '-event-' in d]
+    #device_list = list(set(valid_devices))
+    #n_devices = len(device_list)
     
     # Read the directory to get a list of all connected input devices
     all_devices = os.listdir(INPUT_DEVICES_PATH)
