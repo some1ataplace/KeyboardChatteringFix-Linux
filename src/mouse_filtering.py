@@ -15,9 +15,17 @@ def filter_mouse_chattering(evdev: libevdev.Device, threshold: int, buttons_to_f
         buttons_to_filter = []
 
     while True:
-        for e in evdev.events():
-            if _from_click(e, threshold, buttons_to_filter):
-                ui_dev.send_events([e, libevdev.InputEvent(libevdev.EV_SYN.SYN_REPORT, 0)])
+        try:
+            for e in evdev.events():
+                if _from_click(e, threshold, buttons_to_filter):
+                    ui_dev.send_events([e, libevdev.InputEvent(libevdev.EV_SYN.SYN_REPORT, 0)])
+        except OSError as err:
+            # Errno 19 means "No such device". This happens if the USB is suddenly unplugged.
+            if err.errno == 19:
+                logging.critical("Mouse disconnected while listening. Exiting gracefully.")
+                sys.exit(0)
+            else:
+                raise err
 
 def _from_click(event: libevdev.InputEvent, threshold: int, buttons_to_filter: List[libevdev.EventCode]) -> bool:
     global _last_btn_code
