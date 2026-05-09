@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import DefaultDict, Dict, NoReturn, List
 import time
 import libevdev
+import sys
 
 def filter_mouse_chattering(evdev: libevdev.Device, threshold: int, buttons_to_filter: List[libevdev.EventCode] = None) -> NoReturn:
     time.sleep(1) # Delay for clean startup
