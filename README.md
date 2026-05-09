@@ -35,6 +35,9 @@ Here is a guide on which one to choose:
 - **`-ifXX-event-kbd` (Virtual Mouse Keyboards)**: Advanced gaming mice often register a "virtual keyboard" to handle macro side-buttons. If your mouse's side buttons are double-clicking, you may need to point the mouse script at this endpoint instead of the standard mouse endpoint!
 - **`-event-ifXX` (Interfaces)**: These handle multimedia controls (Volume wheels, Play/Pause) or vendor-specific data (RGB lighting). You rarely need to select these unless your volume wheel is bouncing.
 
+**Troubleshooting Manual Testing:**
+If you run the script manually in the terminal and receive a `[Errno 16] Device or resource busy` error, it means you have a background Systemd service currently running! The script requires an exclusive lock on the hardware. Simply run `sudo systemctl stop keyboard_chattering` or `sudo systemctl stop mouse_chattering` to release the lock before testing manually.
+
 *Note: Legacy raw nodes (like those ending simply in `-mouse` or `-kbd` without the word `event`) are legacy X11 nodes and cannot be read by `libevdev`.*
 
 ## Installation
