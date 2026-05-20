@@ -167,6 +167,24 @@ systemctl status mouse_chattering.service
 journalctl -xeu mouse_chattering.service
 ```
 
+### Step 5: Applying Changes
+
+If you modify the service files, reload the daemon and restart the services to apply the changes:
+
+**For the Keyboard:**
+```shell
+sudo systemctl daemon-reload
+sudo systemctl reenable keyboard_chattering.service
+sudo systemctl restart keyboard_chattering.service
+```
+
+**For the Mouse:**
+```shell
+sudo systemctl daemon-reload
+sudo systemctl reenable mouse_chattering.service
+sudo systemctl restart mouse_chattering.service
+```
+
 ## Automation (Non-Systemd & BSD)
 
 Because the Python scripts rely natively on the OS Kernel (`evdev` and `uinput`), the code works perfectly on non-systemd distributions and BSD variants. Ensure your `.sh` scripts are configured and executable (`chmod +x`), then use the guide below for your specific init system.
