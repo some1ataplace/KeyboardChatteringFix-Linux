@@ -1,7 +1,13 @@
 [Unit]
 Description=Mouse Chattering service
+# Tell systemd to stop this service before going to sleep, and start it after waking up
+After=suspend.target
+After=hibernate.target
+After=hybrid-sleep.target
 
 [Service]
+# Wait 3 seconds before starting the script to give the USB bus and Wayland time to fully wake up
+ExecStartPre=/bin/sleep 3
 # Change ExecStart to the absolute path of the file, executing mouse_chattering.sh
 ExecStart=<absolute/path/to/file/mouse_chattering.sh>
 
@@ -10,3 +16,6 @@ RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
+WantedBy=suspend.target
+WantedBy=hibernate.target
+WantedBy=hybrid-sleep.target
