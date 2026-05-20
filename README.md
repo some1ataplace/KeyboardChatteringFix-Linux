@@ -91,7 +91,7 @@ sudo python -m src.mouse_main
   - Comma-separated list of specific buttons to filter (e.g., `BTN_LEFT,BTN_RIGHT`). You can also permanently define these in `src/mouse_config.py`.
 - `-v {0,1,2}`, `--verbosity {0,1,2}`
 
-## Automation
+## Automation (Systemd)
 
 Starting the scripts manually every time is not ideal. You should set them up as background Systemd services. Because the keyboard and mouse scripts are separate, they can run concurrently in the background without interfering with one another.
 
@@ -166,5 +166,112 @@ journalctl -xeu keyboard_chattering.service
 systemctl status mouse_chattering.service
 journalctl -xeu mouse_chattering.service
 ```
+
+## Automation (Non-Systemd & BSD)
+
+Because the Python scripts rely natively on the OS Kernel (`evdev` and `uinput`), the code works perfectly on non-systemd distributions and BSD variants. Ensure your `.sh` scripts are configured and executable (`chmod +x`), then use the guide below for your specific init system.
+
+**PRO-TIP FOR LOGGING:** Since non-systemd systems lack `journalctl`, you should modify your `.sh` scripts to redirect output so you can read the logs. Append this to the execution lines in your `.sh` files:
+`... -t 30 >> /var/log/keyboard_fix.log 2>&1` (Do the same for `mouse_fix.log`).
+You can then read your logs anytime using `cat /var/log/keyboard_fix.log`.
+
+### Cron (Universal Fallback)
+The easiest way to run the scripts on any system without Systemd is using `cron`'s `@reboot` directive.
+1. Open the root crontab: `sudo crontab -e`
+2. Add both scripts to run in the background (using `&`):
+   ```text
+   @reboot /absolute/path/to/keyboard_chattering.sh &
+   @reboot /absolute/path/to/mouse_chattering.sh &
+   ```
+- **Start Right Now:** Run `sudo /absolute/path/to/keyboard_chattering.sh &` in your terminal.
+- **Status/Logs:** Run `ps aux | grep python3` to ensure they are running. View the `.log` files defined in your script.
+- **Restart:** Run `sudo pkill -f keyboard_main` (or `mouse_main`), then manually start them again.
+
+### OpenRC (Artix, Alpine, Gentoo)
+1. Create two files: `/etc/init.d/keyboard_fix` and `/etc/init.d/mouse_fix`
+2. Paste this template (Adjust names/paths for the mouse version!):
+   ```bash
+   #!/sbin/openrc-run
+   name="Keyboard Chattering Fix"
+   command="/absolute/path/to/keyboard_chattering.sh"
+   command_background=true
+   pidfile="/run/keyboard_fix.pid"
+   depend() { need localmount }
+   ```
+3. Make them executable: `sudo chmod +x /etc/init.d/keyboard_fix /etc/init.d/mouse_fix`
+4. Enable at boot: `sudo rc-update add keyboard_fix default` and `sudo rc-update add mouse_fix default`
+- **Start Right Now / Restart:** `sudo rc-service keyboard_fix start` (or `restart`)
+- **Status:** `sudo rc-service keyboard_fix status`
+
+### Runit (Void Linux)
+1. Create service directories: `sudo mkdir -p /etc/sv/keyboard_fix /etc/sv/mouse_fix`
+2. Create a run file for the keyboard: `sudo nano /etc/sv/keyboard_fix/run`
+   ```bash
+   #!/bin/sh
+   exec /absolute/path/to/keyboard_chattering.sh
+   ```
+3. Create a run file for the mouse: `sudo nano /etc/sv/mouse_fix/run`
+   ```bash
+   #!/bin/sh
+   exec /absolute/path/to/mouse_chattering.sh
+   ```
+4. Make both executable: `sudo chmod +x /etc/sv/keyboard_fix/run /etc/sv/mouse_fix/run`
+5. Enable them: `sudo ln -s /etc/sv/keyboard_fix /var/service/` and `sudo ln -s /etc/sv/mouse_fix /var/service/`
+- **Start Right Now:** Runit detects the symlinks and starts them automatically!
+- **Status:** `sudo sv status keyboard_fix mouse_fix`
+- **Restart:** `sudo sv restart keyboard_fix mouse_fix`
+
+### SysVinit (Devuan, Older Distros)
+Simply add the executable scripts to your `/etc/rc.local` file before the `exit 0` line:
+```bash
+/absolute/path/to/keyboard_chattering.sh &
+/absolute/path/to/mouse_chattering.sh &
+exit 0
+```
+- **Start Right Now:** Run `sudo /etc/rc.local`
+- **Status / Restart:** Use `ps aux | grep python3` to check status, and `kill` them to stop them.
+
+### FreeBSD / BSD Family
+FreeBSD has native support for `evdev`, but you must load the modules and adjust device paths.
+
+**1. Load evdev modules:** Add these to `/boot/loader.conf` and reboot (or `kldload` them now):
+```text
+evdev_load="YES"
+uinput_load="YES"
+```
+
+**2. Find your Device Path:** 
+FreeBSD does not use Linux's `udev` naming conventions. The folder `/dev/input/by-id/` does not exist on BSD! Instead, FreeBSD lists devices as raw event nodes (`/dev/input/event0`, `event1`, etc.).
+Update your `.sh` scripts to pass the raw absolute path directly to `-k` or `-m` (which overrides the auto-search scripts):
+```bash
+# Example keyboard_chattering.sh
+cd /path/to/folder && sudo python3 -m src.keyboard_main -k /dev/input/event0 -t 30 >> /var/log/keyboard_fix.log 2>&1
+```
+
+**3. Automate using `rc.d` scripts:**
+Create two files at `/usr/local/etc/rc.d/keyboard_fix` and `/usr/local/etc/rc.d/mouse_fix`. Here is the keyboard template (duplicate and adjust variables for the mouse):
+```bash
+#!/bin/sh
+# REQUIRE: DAEMON
+# PROVIDE: keyboard_fix
+
+. /etc/rc.subr
+
+name="keyboard_fix"
+rcvar="keyboard_fix_enable"
+# Use daemon to securely background the python script
+command="/usr/sbin/daemon"
+command_args="-p /var/run/keyboard_fix.pid -f /absolute/path/to/keyboard_chattering.sh"
+
+load_rc_config $name
+run_rc_command "$1"
+```
+Make them executable (`sudo chmod +x /usr/local/etc/rc.d/*_fix`), then enable them in your `/etc/rc.conf`:
+```text
+keyboard_fix_enable="YES"
+mouse_fix_enable="YES"
+```
+- **Start Right Now / Restart:** `sudo service keyboard_fix start` (or `restart`)
+- **Status:** `sudo service keyboard_fix status`
 
 *(Note: If your device disconnects, is unplugged, or goes to sleep, the Python script will gracefully exit. Systemd will then safely attempt to restart it every 5 seconds in the background until the device is reconnected, ensuring 0% CPU waste!)*
