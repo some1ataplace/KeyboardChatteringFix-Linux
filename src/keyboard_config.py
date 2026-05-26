@@ -2,15 +2,45 @@
 Constants for keyboard chattering filter configuration.
 
 PRECEDENCE RULES:
-1. Command Line (--keys): Highest priority. If provided, this file is ignored.
-2. This File (FILTERED_KEYS): Used if no command line argument is provided.
-3. Empty: If BOTH the command line and this list are empty, ALL keys will be filtered.
+1. Command Line (--keys / -k): Highest priority. If provided, this file is ignored.
+2. This File: Used if no command line argument is provided.
+3. Interactive Prompt: Used ONLY if both CLI and this file are empty.
 """
+import libevdev
 
+# ==========================================
+# 0. DEFAULT DEVICE
+# ==========================================
+# Set this to avoid the interactive prompt on boot/startup. 
+# Leave as "" to be asked every time if running manually.
+# Example: DEVICE_NAME = "usb-Corsair_Corsair_K70_RGB-event-kbd"
+DEVICE_NAME = ""
+
+# ==========================================
+# 1. SPECIFIC KEY FILTERING (Allowlist)
+# ==========================================
 # To filter specific keys, add them to this set. 
-# Example: FILTERED_KEYS = {"KEY_A", "KEY_SPACE", "KEY_ENTER"}
+# Example: FILTERED_KEYS = {"KEY_A", "KEY_SPACE"}
 # Leave it empty as set() to filter ALL keys by default.
 FILTERED_KEYS = set()
+
+# ==========================================
+# 2. PER-KEY THRESHOLDS
+# ==========================================
+# Override the default threshold for specific keys. 
+# Great for heavy spacebars (needs more debounce) vs light gaming keys (needs less lag).
+KEY_THRESHOLDS = {
+    # "KEY_SPACE": 50,  
+    # "KEY_A": 15,      
+}
+
+# ==========================================
+# 3. KEY REMAPPING / MACROS
+# ==========================================
+# Swap keys at the kernel level. Format: {"KEY_PRESSED": "KEY_OUTPUT"}
+KEY_MAP = {
+    # "KEY_CAPSLOCK": "KEY_LEFTCTRL", # Example: Make CapsLock act as Left Ctrl
+}
 
 
 # ==========================================
