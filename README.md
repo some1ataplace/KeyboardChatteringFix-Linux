@@ -238,6 +238,13 @@ sudo systemctl restart mouse_chattering.service
 
 Because the Python scripts rely natively on the OS Kernel (`evdev` and `uinput`), the code works perfectly on non-systemd distributions and BSD variants. Ensure your `.sh` scripts are configured and executable (`chmod +x`), then use the guide below for your specific init system.
 
+**IMPORTANT SUSPEND/SLEEP WARNING:**
+Systemd natively restarts scripts when a PC wakes from sleep. Non-systemd init systems (Cron, Runit, OpenRC, SysVinit) **do not**. Therefore, if you use *any* of the methods below, you **MUST** append the `-r` (Auto-Reconnect) flag to the execution line inside your `.sh` scripts!
+```bash
+# Example: The -r flag ensures the script survives sleep/suspend cycles!
+cd /path/to/folder && sudo python3 -m src.keyboard_main -k <ID> -t 30 -r
+```
+
 > **💡 PRO-TIP FOR LOGGING:** Since non-systemd systems lack `journalctl`, you should modify your `.sh` scripts to redirect output so you can read the logs. Append a redirect to the execution lines in your `.sh` files:
 > ```bash
 > # For the keyboard script:
