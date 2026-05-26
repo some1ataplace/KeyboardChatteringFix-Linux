@@ -187,17 +187,46 @@ journalctl -xeu mouse_chattering.service
 
 ### Step 5: Applying Changes
 
-If you modify the service files, reload the daemon and restart the services to apply the changes:
+How you apply changes depends on which files you modified. 
 
-**For the Keyboard:**
+**Scenario A: You edited the Python code, `config.py`, or the `.sh` shell scripts**
+
+Systemd doesn't need to reload its own configuration; it just needs to restart the service to execute the newly saved scripts.
 ```shell
-sudo systemctl daemon-reload
-sudo systemctl reenable keyboard_chattering.service
+# For the Keyboard:
 sudo systemctl restart keyboard_chattering.service
+
+# For the Mouse:
+sudo systemctl restart mouse_chattering.service
 ```
 
-**For the Mouse:**
+**Scenario B: You edited the `.service` files themselves**
+
+If you changed settings inside the `.service` files (like `Restart=`, `ExecStart=`, etc.), you must tell systemd to re-read those files from disk before restarting.
 ```shell
+# For the Keyboard:
+sudo systemctl stop keyboard_chattering.service      # Safely stops the current running instance
+sudo systemctl daemon-reload                         # Tells systemd to read the updated .service file
+sudo systemctl restart keyboard_chattering.service   # Starts the service using the new configuration
+
+# For the Mouse:
+sudo systemctl stop mouse_chattering.service
+sudo systemctl daemon-reload
+sudo systemctl restart mouse_chattering.service
+```
+
+**Scenario C: You edited the `[Install]` section of the `.service` files**
+
+The `[Install]` section dictates *when* and *how* the service starts at boot (via `WantedBy=`). If you changed this section, you must re-enable the service to update the boot symlinks.
+```shell
+# For the Keyboard:
+sudo systemctl stop keyboard_chattering.service
+sudo systemctl daemon-reload
+sudo systemctl reenable keyboard_chattering.service  # Removes old boot symlinks and creates new ones
+sudo systemctl restart keyboard_chattering.service
+
+# For the Mouse:
+sudo systemctl stop mouse_chattering.service
 sudo systemctl daemon-reload
 sudo systemctl reenable mouse_chattering.service
 sudo systemctl restart mouse_chattering.service
@@ -244,6 +273,11 @@ The easiest way to run the scripts on any system without Systemd is using `cron`
   sudo /absolute/path/to/keyboard_chattering.sh &
   sudo /absolute/path/to/mouse_chattering.sh &
   ```
+* **Stop:** 
+  ```bash
+  sudo pkill -f keyboard_main
+  sudo pkill -f mouse_main
+  ```
 * **Status/Logs:** 
   ```bash
   ps aux | grep -E 'keyboard_main|mouse_main'
@@ -255,6 +289,7 @@ The easiest way to run the scripts on any system without Systemd is using `cron`
   sudo pkill -f keyboard_main; sudo /absolute/path/to/keyboard_chattering.sh &
   sudo pkill -f mouse_main; sudo /absolute/path/to/mouse_chattering.sh &
   ```
+* **Reenable (Boot Integration):** Run `sudo crontab -e` and update the `@reboot` lines. Cron applies changes automatically on next boot.
 
 ---
 
@@ -307,6 +342,11 @@ depend() { need localmount }
   sudo rc-service keyboard_fix start
   sudo rc-service mouse_fix start
   ```
+* **Stop:** 
+  ```bash
+  sudo rc-service keyboard_fix stop
+  sudo rc-service mouse_fix stop
+  ```
 * **Status/Logs:** 
   ```bash
   sudo rc-service keyboard_fix status
@@ -318,6 +358,11 @@ depend() { need localmount }
   ```bash
   sudo rc-service keyboard_fix restart
   sudo rc-service mouse_fix restart
+  ```
+* **Reenable (Boot Integration):** 
+  ```bash
+  sudo rc-update del keyboard_fix default && sudo rc-update add keyboard_fix default
+  sudo rc-update del mouse_fix default && sudo rc-update add mouse_fix default
   ```
 
 ---
@@ -352,6 +397,11 @@ Runit also supports native respawning, so you do **not** need the `-r` flag.
 
 **Operational Commands:**
 * **Start Right Now:** Runit detects the symlinks and starts them automatically!
+* **Stop:** 
+  ```bash
+  sudo sv stop keyboard_fix
+  sudo sv stop mouse_fix
+  ```
 * **Status/Logs:** 
   ```bash
   sudo sv status keyboard_fix mouse_fix
@@ -362,6 +412,11 @@ Runit also supports native respawning, so you do **not** need the `-r` flag.
   ```bash
   sudo sv restart keyboard_fix
   sudo sv restart mouse_fix
+  ```
+* **Reenable (Boot Integration):** 
+  ```bash
+  sudo rm /var/service/keyboard_fix && sudo ln -s /etc/sv/keyboard_fix /var/service/
+  sudo rm /var/service/mouse_fix && sudo ln -s /etc/sv/mouse_fix /var/service/
   ```
 
 ---
@@ -382,6 +437,11 @@ exit 0
   ```bash
   sudo /etc/rc.local
   ```
+* **Stop:** 
+  ```bash
+  sudo pkill -f keyboard_main
+  sudo pkill -f mouse_main
+  ```
 * **Status/Logs:** 
   ```bash
   ps aux | grep -E 'keyboard_main|mouse_main'
@@ -392,6 +452,11 @@ exit 0
   ```bash
   sudo pkill -f keyboard_main; sudo /absolute/path/to/keyboard_chattering.sh &
   sudo pkill -f mouse_main; sudo /absolute/path/to/mouse_chattering.sh &
+  ```
+* **Reenable (Boot Integration):** *(If using `update-rc.d` instead of `rc.local`)*
+  ```bash
+  sudo update-rc.d -f keyboard_fix remove && sudo update-rc.d keyboard_fix defaults
+  sudo update-rc.d -f mouse_fix remove && sudo update-rc.d mouse_fix defaults
   ```
 
 ---
@@ -471,6 +536,11 @@ run_rc_command "$1"
   sudo service keyboard_fix start
   sudo service mouse_fix start
   ```
+* **Stop:** 
+  ```bash
+  sudo service keyboard_fix stop
+  sudo service mouse_fix stop
+  ```
 * **Status/Logs:** 
   ```bash
   sudo service keyboard_fix status
@@ -482,4 +552,9 @@ run_rc_command "$1"
   ```bash
   sudo service keyboard_fix restart
   sudo service mouse_fix restart
+  ```
+* **Reenable (Boot Integration):** Ensure `/etc/rc.conf` contains the enable variables. You can quickly force them using:
+  ```bash
+  sudo sysrc keyboard_fix_enable="YES"
+  sudo sysrc mouse_fix_enable="YES"
   ```
