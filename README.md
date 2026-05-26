@@ -1,4 +1,4 @@
-# __Keyboard Chattering & Mouse Double-Click Fix for Linux__
+# __Keyboard & Mouse Chattering Fix for Linux__
 
 [![GitHub](https://img.shields.io/github/license/w2sv/KeyboardChatteringFix-Linux?)](LICENSE)
 
@@ -6,7 +6,7 @@ __A tool for filtering mechanical keyboard chattering and mouse double-clicking 
 
 ## The problem
 
-Switches on mechanical keyboards occasionally start to "chatter" or "bounce", meaning when you press a key with a faulty switch it erroneously detects two or even more key presses. Similarly, mechanical switches on mice (especially gaming mice) frequently develop "double-click" issues where a single physical click registers as multiple rapid clicks.
+Switches on mechanical keyboards occasionally start to "chatter" or "bounce", meaning when you press a key with a faulty switch it erroneously detects two or even more key presses. Similarly, mechanical switches on mice (especially gaming mice) frequently develop "double-click" issues, and faulty scroll wheel encoders will randomly glitch and scroll in the wrong direction.
 
 ## The existing solutions
 
@@ -24,37 +24,17 @@ This also means it works across the whole system, without depending on X11 or Wa
 
 As for the filtering rule, what seems to work well is the time between the last "key up" event and the current "key down" event. When the switch chatters, that time is very low - around 10 ms. By filtering such anomalies, we remove chatter without impeding actual fast typing or clicking.
 
-### Understanding Linux Input Devices (Which one do I pick?)
-
-Modern gaming peripherals (like Corsair, Razer, or Logitech) are "composite USB devices". This means a single physical mouse might tell Linux it is actually 4 different devices! When you run the scripts manually, you will see a list of endpoints ending in different suffixes. 
-
-Here is a guide on which one to choose:
-
-- **`-event-kbd`**: The primary endpoint for standard keystrokes. For keyboards, select this to fix chattering on standard keys (A-Z, 0-9). 
-- **`-event-mouse`**: The primary endpoint for standard mouse clicks (Left, Right, Middle) and X/Y movement. Select this to fix standard mouse double-clicking.
-- **`-ifXX-event-kbd` (Virtual Mouse Keyboards)**: Advanced gaming mice often register a "virtual keyboard" to handle macro side-buttons. If your mouse's side buttons are double-clicking, you may need to point the mouse script at this endpoint instead of the standard mouse endpoint!
-- **`-event-ifXX` (Interfaces)**: These handle multimedia controls (Volume wheels, Play/Pause) or vendor-specific data (RGB lighting). You rarely need to select these unless your volume wheel is bouncing.
-
-**Troubleshooting Manual Testing:**
-If you run the script manually in the terminal and receive a `[Errno 16] Device or resource busy` error, it means you have a background Systemd service currently running! The script requires an exclusive lock on the hardware. Simply run `sudo systemctl stop keyboard_chattering` or `sudo systemctl stop mouse_chattering` to release the lock before testing manually.
-
-*Note: Legacy raw nodes (like those ending simply in `-mouse` or `-kbd` without the word `event`) are legacy X11 nodes and cannot be read by `libevdev`.*
-
 ## Installation
 
-Download the repository and extract the files. The dependencies are listed in `requirements.txt`. You can install them with the command below. 
+Download the repository and extract the files. `cd` into the extracted folder.
 
-*(Note: According to PEP 668, newer Linux distributions may require the `--break-system-packages` flag, or the use of a python `venv`)*.
+Due to PEP 668 on modern Linux distributions, globally installing Python packages via `pip` is restricted to prevent breaking system tools. You have two options to install the required `libevdev` dependency:
 
-```shell
-sudo pip install -r requirements.txt --break-system-packages
-```
-
-### Python Virtual Environment
+### Option 1: Python Virtual Environment (Recommended)
 Using the built-in `venv` module is the safest and cleanest way to run this tool.
 ```shell
 # 1. Create a virtual environment named 'venv' inside the project folder
-python -m venv venv
+python3 -m venv venv
 
 # 2. Activate the virtual environment
 source venv/bin/activate
@@ -63,18 +43,27 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Usage
-
-`cd` inside the location of the extracted folder. Because keyboards and mice are handled differently by the OS, they are executed as separate modules. Enter the commands below to run them manually:
-
-**To run the Keyboard fix:**
+### Option 2: Global Install (Quickest)
+If you do not want to use a virtual environment, you can override the system protection flag.
 ```shell
-sudo python -m src.keyboard_main
+sudo pip3 install -r requirements.txt --break-system-packages
 ```
 
-**To run the Mouse fix:**
+## Usage
+
+Because keyboards and mice are handled differently by the OS, they are executed as separate modules. 
+
+**If you used a Virtual Environment (Option 1):**
+Because `sudo` drops your local path, you must point `sudo` directly to your virtual environment's Python binary:
 ```shell
-sudo python -m src.mouse_main
+sudo venv/bin/python3 -m src.keyboard_main
+sudo venv/bin/python3 -m src.mouse_main
+```
+
+**If you installed Globally (Option 2):**
+```shell
+sudo python3 -m src.keyboard_main
+sudo python3 -m src.mouse_main
 ```
 
 ### Customization Options
@@ -85,27 +74,56 @@ sudo python -m src.mouse_main
   - Name of your double-clicking mouse device. Works identically to the keyboard argument above.
 - `-t THRESHOLD`, `--threshold THRESHOLD`
   - Filter time threshold in milliseconds. Default=30ms. Note: This denotes the time between a key/button being *released* and pressed again. For reference, if you click really fast, this delay is around 50 ms.
+- `-r`, `--reconnect`
+  - Runs an infinite retry loop to wait for disconnected devices. Use this if running manually in a terminal or using `cron`, but **DO NOT** use this if using Systemd! Systemd natively handles restarts much cleaner in the background.
 - `--keys KEYS` (For Keyboard)
   - Comma-separated list of specific keys to filter (e.g., `KEY_A,KEY_SPACE`). If provided, *only* these keys will be filtered, leaving the rest of your keyboard untouched. You can also permanently define these in `src/keyboard_config.py`.
 - `--buttons BUTTONS` (For Mouse)
   - Comma-separated list of specific buttons to filter (e.g., `BTN_LEFT,BTN_RIGHT`). You can also permanently define these in `src/mouse_config.py`.
-- `-v {0,1,2}`, `--verbosity {0,1,2}`
+
+### Advanced Mouse & Sensor Filtering Features
+If you have a faulty mouse sensor or a broken scroll wheel, you can pass these additional arguments to `mouse_main`:
+- `-sr SCROLL_REV`, `--scroll-reverse SCROLL_REV`
+  - Fixes scroll wheels that jump in the opposite direction. Filters direction changes that occur faster than the threshold. Default=0 (Disabled). Try `100` to `150` for glitchy wheels.
+- `-sd SCROLL_DBL`, `--scroll-double SCROLL_DBL`
+  - Fixes worn encoders firing two ticks for one physical notch. Filters identical scrolls happening too fast. Default=0 (Disabled). *(Caution: Do not use this if your mouse has an infinite free-spinning scroll wheel!)*
+- `-jl JUMP`, `--jump-limit JUMP`
+  - Blocks massive teleporting cursor jumps caused by dirty laser sensors or hairs. Drops frames exceeding X pixels (e.g., `300`).
+
+### Hotplugging, Remapping & Per-Key Thresholds
+The configuration files (`src/keyboard_config.py` and `src/mouse_config.py`) contain powerful advanced options:
+- **Per-Key Thresholds:** Keys physically wear differently. You can set your heavy Spacebar to a `50ms` delay to prevent chatter, while leaving your `A` key at `15ms` for fast gaming. 
+- **Remapping / Macros:** Because this intercepts kernel events, you can natively remap buttons (e.g. swap `KEY_CAPSLOCK` to `KEY_LEFTCTRL`, or `BTN_SIDE` to `BTN_MIDDLE`). This works flawlessly on both X11 and Wayland.
+
+### Understanding Linux Input Devices (Which one do I pick?)
+
+Modern gaming peripherals (like Corsair, Razer, or Logitech) are "composite USB devices". This means a single physical mouse might tell Linux it is actually a mouse, a keyboard, and a multimedia controller all at once! 
+
+Because of this, both the keyboard and mouse scripts will list *all* available event endpoints to give you maximum flexibility. Here is a guide on which one to choose:
+
+- **`-event-kbd`**: The primary endpoint for standard keystrokes. For keyboards, select this to fix chattering on standard keys (A-Z, 0-9). 
+- **`-event-mouse`**: The primary endpoint for standard mouse clicks (Left, Right, Middle) and X/Y movement. Select this to fix standard mouse double-clicking.
+- **`-ifXX-event-kbd` (Virtual Keyboards)**: Advanced gaming mice often register a "virtual keyboard" to handle macro side-buttons. If your mouse's side buttons are double-clicking, you may need to point the mouse script at this endpoint instead of the standard mouse endpoint!
+- **`-event-ifXX` (Interfaces)**: These handle multimedia controls (Volume wheels, Play/Pause) or vendor-specific data (RGB lighting). You rarely need to select these.
+
+**Troubleshooting Manual Testing:**
+If you run the script manually in the terminal and receive a `[Errno 16] Device or resource busy` error, it means you have a background service currently running! The script requires an exclusive lock on the hardware. Stop your background service to release the lock before testing manually.
 
 ## Automation (Systemd)
 
-Starting the scripts manually every time is not ideal. You should set them up as background Systemd services. Because the keyboard and mouse scripts are separate, they can run concurrently in the background without interfering with one another.
+Starting the scripts manually every time is not ideal. You should set them up as background Systemd services. 
 
 ### Step 1: Configure the shell scripts
-Modify `keyboard_chattering.sh` and/or `mouse_chattering.sh` to `cd` into the absolute path of your downloaded folder, and input your device IDs and desired thresholds. 
+Modify `keyboard_chattering.sh` and/or `mouse_chattering.sh` to `cd` into the absolute path of your downloaded folder, and input your device IDs and desired thresholds. *(Note: If using a venv, replace `python3` with `venv/bin/python3`).*
 
 **Example `keyboard_chattering.sh`:**
 ```shell
-cd /home/foouser/Downloads/HardwareChatteringFix-Linux/ && sudo python3 -m src.keyboard_main -k usb-SINO_WEALTH_USB_KEYBOARD-event-kbd -t 40 --keys KEY_E,KEY_SPACE
+cd /home/foouser/Downloads/HardwareChatteringFix-Linux/ && sudo python3 -m src.keyboard_main -k usb-Logitech_Keyboard-event-kbd -t 40 --keys KEY_E,KEY_SPACE
 ```
 
 **Example `mouse_chattering.sh`:**
 ```shell
-cd /home/foouser/Downloads/HardwareChatteringFix-Linux/ && sudo python3 -m src.mouse_main -m usb-Logitech_Gaming_Mouse-event-mouse -t 50 --buttons BTN_LEFT,BTN_RIGHT
+cd /home/foouser/Downloads/HardwareChatteringFix-Linux/ && sudo python3 -m src.mouse_main -m usb-Logitech_Mouse-event-mouse -t 50 --buttons BTN_LEFT,BTN_RIGHT
 ```
 
 Make sure to change the file permissions so they are executable:
@@ -114,7 +132,7 @@ chmod +x keyboard_chattering.sh mouse_chattering.sh
 ```
 
 ### Step 2: Configure the service files
-Edit `keyboard_chattering.service` and `mouse_chattering.service`. The `ExecStart` should be the absolute path of the respective `.sh` file. 
+Edit `keyboard_chattering.service` and `mouse_chattering.service` to point `ExecStart` to the absolute path of your `.sh` files. 
 
 **Example keyboard_chattering.service:**
 ```shell
@@ -185,44 +203,133 @@ sudo systemctl reenable mouse_chattering.service
 sudo systemctl restart mouse_chattering.service
 ```
 
+---
+
 ## Automation (Non-Systemd & BSD)
 
 Because the Python scripts rely natively on the OS Kernel (`evdev` and `uinput`), the code works perfectly on non-systemd distributions and BSD variants. Ensure your `.sh` scripts are configured and executable (`chmod +x`), then use the guide below for your specific init system.
 
-**PRO-TIP FOR LOGGING:** Since non-systemd systems lack `journalctl`, you should modify your `.sh` scripts to redirect output so you can read the logs. Append this to the execution lines in your `.sh` files:
-`... -t 30 >> /var/log/keyboard_fix.log 2>&1` (Do the same for `mouse_fix.log`).
-You can then read your logs anytime using `cat /var/log/keyboard_fix.log`.
+> **💡 PRO-TIP FOR LOGGING:** Since non-systemd systems lack `journalctl`, you should modify your `.sh` scripts to redirect output so you can read the logs. Append a redirect to the execution lines in your `.sh` files:
+> ```bash
+> # For the keyboard script:
+> cd /absolute/path/to/project && sudo python3 -m src.keyboard_main -k <KEYBOARD id> -t 30 >> /var/log/keyboard_fix.log 2>&1
+> 
+> # For the mouse script:
+> cd /absolute/path/to/project && sudo python3 -m src.mouse_main -m <MOUSE id> -t 30 >> /var/log/mouse_fix.log 2>&1
+> ```
+> You can then read your logs anytime using `cat /var/log/keyboard_fix.log` or `cat /var/log/mouse_fix.log`.
+
+---
 
 ### Cron (Universal Fallback)
+
 The easiest way to run the scripts on any system without Systemd is using `cron`'s `@reboot` directive.
-1. Open the root crontab: `sudo crontab -e`
-2. Add both scripts to run in the background (using `&`):
+
+1. Because `cron` does not auto-restart failed scripts, you **MUST** add the `-r` flag to your `.sh` scripts so they survive hardware disconnects!
+   ```bash
+   # Example addition inside your .sh files:
+   python3 -m src.keyboard_main -k <ID> -t 30 -r
+   python3 -m src.mouse_main -m <ID> -t 30 -r
+   ```
+2. Open the root crontab: `sudo crontab -e`
+3. Add both scripts to run in the background (using `&`):
    ```text
    @reboot /absolute/path/to/keyboard_chattering.sh &
    @reboot /absolute/path/to/mouse_chattering.sh &
    ```
-- **Start Right Now:** Run `sudo /absolute/path/to/keyboard_chattering.sh &` in your terminal.
-- **Status/Logs:** Run `ps aux | grep python3` to ensure they are running. View the `.log` files defined in your script.
-- **Restart:** Run `sudo pkill -f keyboard_main` (or `mouse_main`), then manually start them again.
+
+**Operational Commands:**
+* **Start Right Now:** 
+  ```bash
+  sudo /absolute/path/to/keyboard_chattering.sh &
+  sudo /absolute/path/to/mouse_chattering.sh &
+  ```
+* **Status/Logs:** 
+  ```bash
+  ps aux | grep -E 'keyboard_main|mouse_main'
+  cat /var/log/keyboard_fix.log
+  cat /var/log/mouse_fix.log
+  ```
+* **Restart:** 
+  ```bash
+  sudo pkill -f keyboard_main; sudo /absolute/path/to/keyboard_chattering.sh &
+  sudo pkill -f mouse_main; sudo /absolute/path/to/mouse_chattering.sh &
+  ```
+
+---
 
 ### OpenRC (Artix, Alpine, Gentoo)
-1. Create two files: `/etc/init.d/keyboard_fix` and `/etc/init.d/mouse_fix`
-2. Paste this template (Adjust names/paths for the mouse version!):
-   ```bash
-   #!/sbin/openrc-run
-   name="Keyboard Chattering Fix"
-   command="/absolute/path/to/keyboard_chattering.sh"
-   command_background=true
-   pidfile="/run/keyboard_fix.pid"
-   depend() { need localmount }
-   ```
+
+OpenRC supports native respawning, so you do **not** need the `-r` flag.
+
+1. Create two files: `sudo nano /etc/init.d/keyboard_fix` and `sudo nano /etc/init.d/mouse_fix`
+2. Paste the appropriate template below into each file:
+
+**Keyboard Template (`/etc/init.d/keyboard_fix`):**
+```bash
+#!/sbin/openrc-run
+name="Keyboard Chattering Fix"
+command="/absolute/path/to/keyboard_chattering.sh"
+command_background=true
+pidfile="/run/keyboard_fix.pid"
+
+# Enable native systemd-like auto-restarts!
+respawn=true
+respawn_delay=5
+
+depend() { need localmount }
+```
+
+**Mouse Template (`/etc/init.d/mouse_fix`):**
+```bash
+#!/sbin/openrc-run
+name="Mouse Chattering Fix"
+command="/absolute/path/to/mouse_chattering.sh"
+command_background=true
+pidfile="/run/mouse_fix.pid"
+
+respawn=true
+respawn_delay=5
+
+depend() { need localmount }
+```
+
 3. Make them executable: `sudo chmod +x /etc/init.d/keyboard_fix /etc/init.d/mouse_fix`
-4. Enable at boot: `sudo rc-update add keyboard_fix default` and `sudo rc-update add mouse_fix default`
-- **Start Right Now / Restart:** `sudo rc-service keyboard_fix start` (or `restart`)
-- **Status:** `sudo rc-service keyboard_fix status`
+4. Enable at boot: 
+   ```bash
+   sudo rc-update add keyboard_fix default
+   sudo rc-update add mouse_fix default
+   ```
+
+**Operational Commands:**
+* **Start Right Now:** 
+  ```bash
+  sudo rc-service keyboard_fix start
+  sudo rc-service mouse_fix start
+  ```
+* **Status/Logs:** 
+  ```bash
+  sudo rc-service keyboard_fix status
+  sudo rc-service mouse_fix status
+  cat /var/log/keyboard_fix.log
+  cat /var/log/mouse_fix.log
+  ```
+* **Restart:** 
+  ```bash
+  sudo rc-service keyboard_fix restart
+  sudo rc-service mouse_fix restart
+  ```
+
+---
 
 ### Runit (Void Linux)
-1. Create service directories: `sudo mkdir -p /etc/sv/keyboard_fix /etc/sv/mouse_fix`
+
+Runit also supports native respawning, so you do **not** need the `-r` flag.
+
+1. Create service directories: 
+   ```bash
+   sudo mkdir -p /etc/sv/keyboard_fix /etc/sv/mouse_fix
+   ```
 2. Create a run file for the keyboard: `sudo nano /etc/sv/keyboard_fix/run`
    ```bash
    #!/bin/sh
@@ -233,23 +340,64 @@ The easiest way to run the scripts on any system without Systemd is using `cron`
    #!/bin/sh
    exec /absolute/path/to/mouse_chattering.sh
    ```
-4. Make both executable: `sudo chmod +x /etc/sv/keyboard_fix/run /etc/sv/mouse_fix/run`
-5. Enable them: `sudo ln -s /etc/sv/keyboard_fix /var/service/` and `sudo ln -s /etc/sv/mouse_fix /var/service/`
-- **Start Right Now:** Runit detects the symlinks and starts them automatically!
-- **Status:** `sudo sv status keyboard_fix mouse_fix`
-- **Restart:** `sudo sv restart keyboard_fix mouse_fix`
+4. Make both executable: 
+   ```bash
+   sudo chmod +x /etc/sv/keyboard_fix/run /etc/sv/mouse_fix/run
+   ```
+5. Enable them (symlink to runit's service directory): 
+   ```bash
+   sudo ln -s /etc/sv/keyboard_fix /var/service/
+   sudo ln -s /etc/sv/mouse_fix /var/service/
+   ```
+
+**Operational Commands:**
+* **Start Right Now:** Runit detects the symlinks and starts them automatically!
+* **Status/Logs:** 
+  ```bash
+  sudo sv status keyboard_fix mouse_fix
+  cat /var/log/keyboard_fix.log
+  cat /var/log/mouse_fix.log
+  ```
+* **Restart:** 
+  ```bash
+  sudo sv restart keyboard_fix
+  sudo sv restart mouse_fix
+  ```
+
+---
 
 ### SysVinit (Devuan, Older Distros)
+
+SysVinit does not restart scripts natively. You **MUST** add the `-r` flag to your `.sh` scripts (as shown in the Cron section).
+
 Simply add the executable scripts to your `/etc/rc.local` file before the `exit 0` line:
 ```bash
 /absolute/path/to/keyboard_chattering.sh &
 /absolute/path/to/mouse_chattering.sh &
 exit 0
 ```
-- **Start Right Now:** Run `sudo /etc/rc.local`
-- **Status / Restart:** Use `ps aux | grep python3` to check status, and `kill` them to stop them.
+
+**Operational Commands:**
+* **Start Right Now:** 
+  ```bash
+  sudo /etc/rc.local
+  ```
+* **Status/Logs:** 
+  ```bash
+  ps aux | grep -E 'keyboard_main|mouse_main'
+  cat /var/log/keyboard_fix.log
+  cat /var/log/mouse_fix.log
+  ```
+* **Restart:** 
+  ```bash
+  sudo pkill -f keyboard_main; sudo /absolute/path/to/keyboard_chattering.sh &
+  sudo pkill -f mouse_main; sudo /absolute/path/to/mouse_chattering.sh &
+  ```
+
+---
 
 ### FreeBSD / BSD Family
+
 FreeBSD has native support for `evdev`, but you must load the modules and adjust device paths.
 
 **1. Load evdev modules:** Add these to `/boot/loader.conf` and reboot (or `kldload` them now):
@@ -264,10 +412,15 @@ Update your `.sh` scripts to pass the raw absolute path directly to `-k` or `-m`
 ```bash
 # Example keyboard_chattering.sh
 cd /path/to/folder && sudo python3 -m src.keyboard_main -k /dev/input/event0 -t 30 >> /var/log/keyboard_fix.log 2>&1
+
+# Example mouse_chattering.sh
+cd /path/to/folder && sudo python3 -m src.mouse_main -m /dev/input/event1 -t 30 >> /var/log/mouse_fix.log 2>&1
 ```
 
 **3. Automate using `rc.d` scripts:**
-Create two files at `/usr/local/etc/rc.d/keyboard_fix` and `/usr/local/etc/rc.d/mouse_fix`. Here is the keyboard template (duplicate and adjust variables for the mouse):
+Create two files: `sudo nano /usr/local/etc/rc.d/keyboard_fix` and `sudo nano /usr/local/etc/rc.d/mouse_fix`.
+
+**Keyboard Template (`/usr/local/etc/rc.d/keyboard_fix`):**
 ```bash
 #!/bin/sh
 # REQUIRE: DAEMON
@@ -277,19 +430,56 @@ Create two files at `/usr/local/etc/rc.d/keyboard_fix` and `/usr/local/etc/rc.d/
 
 name="keyboard_fix"
 rcvar="keyboard_fix_enable"
-# Use daemon to securely background the python script
+
+# Use daemon to securely background the script.
+# We pass the -r flag to 'daemon' so it auto-restarts the script if it dies!
 command="/usr/sbin/daemon"
-command_args="-p /var/run/keyboard_fix.pid -f /absolute/path/to/keyboard_chattering.sh"
+command_args="-r -P /var/run/keyboard_fix.pid -f /absolute/path/to/keyboard_chattering.sh"
 
 load_rc_config $name
 run_rc_command "$1"
 ```
-Make them executable (`sudo chmod +x /usr/local/etc/rc.d/*_fix`), then enable them in your `/etc/rc.conf`:
-```text
-keyboard_fix_enable="YES"
-mouse_fix_enable="YES"
-```
-- **Start Right Now / Restart:** `sudo service keyboard_fix start` (or `restart`)
-- **Status:** `sudo service keyboard_fix status`
 
-*(Note: If your device disconnects, is unplugged, or goes to sleep, the Python script will gracefully exit. Systemd will then safely attempt to restart it every 5 seconds in the background until the device is reconnected, ensuring 0% CPU waste!)*
+**Mouse Template (`/usr/local/etc/rc.d/mouse_fix`):**
+```bash
+#!/bin/sh
+# REQUIRE: DAEMON
+# PROVIDE: mouse_fix
+
+. /etc/rc.subr
+
+name="mouse_fix"
+rcvar="mouse_fix_enable"
+
+command="/usr/sbin/daemon"
+command_args="-r -P /var/run/mouse_fix.pid -f /absolute/path/to/mouse_chattering.sh"
+
+load_rc_config $name
+run_rc_command "$1"
+```
+
+4. Make them executable: `sudo chmod +x /usr/local/etc/rc.d/keyboard_fix /usr/local/etc/rc.d/mouse_fix`
+5. Enable them in your `/etc/rc.conf`:
+   ```text
+   keyboard_fix_enable="YES"
+   mouse_fix_enable="YES"
+   ```
+
+**Operational Commands:**
+* **Start Right Now:** 
+  ```bash
+  sudo service keyboard_fix start
+  sudo service mouse_fix start
+  ```
+* **Status/Logs:** 
+  ```bash
+  sudo service keyboard_fix status
+  sudo service mouse_fix status
+  cat /var/log/keyboard_fix.log
+  cat /var/log/mouse_fix.log
+  ```
+* **Restart:** 
+  ```bash
+  sudo service keyboard_fix restart
+  sudo service mouse_fix restart
+  ```
