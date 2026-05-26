@@ -3,84 +3,85 @@ from collections import defaultdict
 from typing import DefaultDict, Dict, NoReturn, List
 import time
 import libevdev
-import sys
 
-def filter_chattering(evdev: libevdev.Device, threshold: int, keys_to_filter: List[libevdev.EventCode] = None) -> NoReturn:
-    # Delay to allow the Enter key (used to execute the terminal command) 
-    # to release natively before we grab the device. Prevents a "stuck" Enter key.
-    time.sleep(1) 
+def filter_chattering(evdev: libevdev.Device, default_threshold: int, keys_to_filter: List[libevdev.EventCode], 
+                      key_thresholds: dict, key_map: dict) -> NoReturn:
     
-    # Grab the physical device so only we see the events it emits
+    # Reset global states on reconnect to prevent ghost "stuck" keys
+    global _last_key_code
+    _last_key_up.clear()
+    _key_pressed.clear()
+    _last_key_code = None
+
+    time.sleep(1) # Delay to allow Enter key to release natively after running script
     evdev.grab()
-    
-    # Create a virtual uinput device to emit our cleaned events back to the OS
     ui_dev = evdev.create_uinput_device()
-
     logging.info("Listening to keyboard input events...")
 
-    if not keys_to_filter:
-        keys_to_filter = []
-
     while True:
-        # Descriptor is blocking; waits until physical events are available
         try:
             for e in evdev.events():
-                if _from_keystroke(e, threshold, keys_to_filter):
-                    ui_dev.send_events([e, libevdev.InputEvent(libevdev.EV_SYN.SYN_REPORT, 0)])
-        except OSError as err:
-            # Errno 19 means "No such device". This happens if the USB is suddenly unplugged.
-            if err.errno == 19:
-                logging.critical("Keyboard disconnected while listening. Exiting gracefully.")
-                sys.exit(0)
-            else:
-                raise err
+                # Process the event. _from_keystroke returns either the (modified) event, or None to drop it.
+                processed_event = _from_keystroke(e, default_threshold, keys_to_filter, key_thresholds, key_map)
+                if processed_event:
+                    ui_dev.send_events([processed_event, libevdev.InputEvent(libevdev.EV_SYN.SYN_REPORT, 0)])
+        except libevdev.EventsDroppedException:
+            # If the user presses too many keys simultaneously (NKRO overflow), resync the buffer
+            logging.debug("Kernel buffer overflowed. Resyncing...")
+            for e in evdev.sync():
+                processed_event = _from_keystroke(e, default_threshold, keys_to_filter, key_thresholds, key_map)
+                if processed_event:
+                    ui_dev.send_events([processed_event, libevdev.InputEvent(libevdev.EV_SYN.SYN_REPORT, 0)])
 
-
-def _from_keystroke(event: libevdev.InputEvent, threshold: int, keys_to_filter: List[libevdev.EventCode]) -> bool:
+def _from_keystroke(event: libevdev.InputEvent, default_threshold: int, keys_to_filter: List[libevdev.EventCode], 
+                    key_thresholds: dict, key_map: dict):
     global _last_key_code
     
-    # Ignore sync/misc events. libevdev uinput handles syncing natively.
+    # Ignore sync/misc events natively
     if event.matches(libevdev.EV_SYN) or event.matches(libevdev.EV_MSC):
-        return False
+        return None
 
-    # MODIFIER FIX: If the event isn't a key, or it's a "hold" event (event.value > 1), forward it immediately.
-    # This ensures held keys (like Shift or Ctrl) don't get interrupted by the chatter filter.
+    # REMAPPING: Safely construct a brand new event object to prevent mutating C-bindings
+    if event.matches(libevdev.EV_KEY) and event.code.name in key_map:
+        target_key_name = key_map[event.code.name]
+        event = libevdev.InputEvent(libevdev.evbit(target_key_name), event.value, event.sec, event.usec)
+        if event.value == 1: # Only log on the key-down to prevent log spam
+            logging.debug(f'REMAPPED to {target_key_name}')
+
+    # Do not filter modifier combinations or natively held keys (value > 1)
     if not event.matches(libevdev.EV_KEY) or event.value > 1:
-        logging.debug(f'FORWARDING {event.code}')
-        return True
+        return event
 
-    # TARGETED FILTERING: If the user provided specific keys to fix, and this isn't one of them, forward it.
+    # If an allowlist is provided and this key isn't in it, forward it without filtering
     if keys_to_filter and event.code not in keys_to_filter:
-        logging.debug(f'FORWARDING {event.code} (not in targeted filter list)')
-        return True
+        return event
 
-    # Process standard Key Up (0) and Key Down (1) events
+    # PER-KEY THRESHOLDS: Check if this specific key has a custom delay, else use default.
+    threshold = key_thresholds.get(event.code.name, default_threshold)
+
+    # Process standard Key Up (0) events
     if event.value == 0:
         if _key_pressed[event.code]:
-            logging.debug(f'FORWARDING {event.code} up')
+            logging.debug(f'FORWARDING {event.code.name} up')
             _last_key_up[event.code] = event.sec * 1E6 + event.usec
             _key_pressed[event.code] = False
-            return True
+            return event
         else:
-            logging.info(f'FILTERING {event.code} up: key not pressed beforehand')
-            return False
+            return None
 
     prev = _last_key_up.get(event.code)
     now = event.sec * 1E6 + event.usec
 
-    # DOUBLE-LETTER FIX: Check `_last_key_code != event.code`.
-    # If a user types fast alternating letters (e.g. e -> v -> e), the second 'e' won't be 
-    # mistakenly filtered, because the 'v' reset the _last_key_code.
+    # Check _last_key_code to prevent filtering fast alternating letters (e.g., e -> v -> e)
     if prev is None or now - prev > threshold * 1E3 or _last_key_code != event.code:
-        logging.debug(f'FORWARDING {event.code} down')
+        logging.debug(f'FORWARDING {event.code.name} down')
         _key_pressed[event.code] = True
         _last_key_code = event.code
-        return True
+        return event
 
-    logging.info(f'FILTERED {event.code} down: last key up event happened {(now - prev) / 1E3} ms ago')
-    return False
+    logging.info(f'FILTERED {event.code.name} down: bounced within {threshold}ms')
+    return None
 
-# Global state trackers
 _last_key_up: Dict[libevdev.EventCode, int] = {}
 _key_pressed: DefaultDict[libevdev.EventCode, bool] = defaultdict(bool)
 _last_key_code = None
