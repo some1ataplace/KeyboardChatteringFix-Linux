@@ -302,7 +302,7 @@ The easiest way to run the scripts on any system without Systemd is using `cron`
 
 ### OpenRC (Artix, Alpine, Gentoo)
 
-OpenRC supports native respawning, so you do **not** need the `-r` flag.
+Even though OpenRC supports native respawning, you **MUST** add the `-r` flag to your `.sh` scripts. This prevents the script from crash-looping when the USB bus briefly drops during sleep/wake cycles.
 
 1. Create two files: `sudo nano /etc/init.d/keyboard_fix` and `sudo nano /etc/init.d/mouse_fix`
 2. Paste the appropriate template below into each file:
@@ -376,7 +376,7 @@ depend() { need localmount }
 
 ### Runit (Void Linux)
 
-Runit also supports native respawning, so you do **not** need the `-r` flag.
+Even though Runit supports native respawning, you **MUST** add the `-r` flag to your `.sh` scripts. This prevents the script from crash-looping when the USB bus briefly drops during sleep/wake cycles.
 
 1. Create service directories: 
    ```bash
