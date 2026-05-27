@@ -259,6 +259,8 @@ cd /path/to/folder && sudo python3 -m src.keyboard_main -k <ID> -t 30 -r
 
 ### Cron (Universal Fallback)
 
+Cron does not restart scripts natively. You **MUST** add the `-r` flag to your `.sh` scripts.
+
 The easiest way to run the scripts on any system without Systemd is using `cron`'s `@reboot` directive.
 
 1. Because `cron` does not auto-restart failed scripts, you **MUST** add the `-r` flag to your `.sh` scripts so they survive hardware disconnects!
@@ -430,7 +432,7 @@ Even though Runit supports native respawning, you **MUST** add the `-r` flag to 
 
 ### SysVinit (Devuan, Older Distros)
 
-SysVinit does not restart scripts natively. You **MUST** add the `-r` flag to your `.sh` scripts (as shown in the Cron section).
+SysVinit does not restart scripts natively. You **MUST** add the `-r` flag to your `.sh` scripts.
 
 Simply add the executable scripts to your `/etc/rc.local` file before the `exit 0` line:
 ```bash
@@ -469,6 +471,8 @@ exit 0
 ---
 
 ### FreeBSD / BSD Family
+
+FreeBSD does not restart scripts natively. You **MUST** add the `-r` flag to your `.sh` scripts.
 
 FreeBSD has native support for `evdev`, but you must load the modules and adjust device paths.
 
