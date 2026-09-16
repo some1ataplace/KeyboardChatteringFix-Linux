@@ -8,10 +8,8 @@ def filter_chattering(evdev: libevdev.Device, default_threshold: int, keys_to_fi
                       key_thresholds: dict, key_map: dict) -> NoReturn:
     
     # Reset global states on reconnect to prevent ghost "stuck" keys
-    global _last_key_code
     _last_key_up.clear()
     _key_pressed.clear()
-    _last_key_code = None
 
     time.sleep(1) # Delay to allow Enter key to release natively after running script
     evdev.grab()
@@ -35,7 +33,6 @@ def filter_chattering(evdev: libevdev.Device, default_threshold: int, keys_to_fi
 
 def _from_keystroke(event: libevdev.InputEvent, default_threshold: int, keys_to_filter: List[libevdev.EventCode], 
                     key_thresholds: dict, key_map: dict):
-    global _last_key_code
     
     # Ignore sync/misc events natively
     if event.matches(libevdev.EV_SYN) or event.matches(libevdev.EV_MSC):
@@ -72,11 +69,10 @@ def _from_keystroke(event: libevdev.InputEvent, default_threshold: int, keys_to_
     prev = _last_key_up.get(event.code)
     now = event.sec * 1E6 + event.usec
 
-    # Check _last_key_code to prevent filtering fast alternating letters (e.g., e -> v -> e)
-    if prev is None or now - prev > threshold * 1E3 or _last_key_code != event.code:
+    # Check time since last key up event for this specific key
+    if prev is None or now - prev > threshold * 1E3:
         logging.debug(f'FORWARDING {event.code.name} down')
         _key_pressed[event.code] = True
-        _last_key_code = event.code
         return event
 
     logging.info(f'FILTERED {event.code.name} down: bounced within {threshold}ms')
@@ -84,4 +80,3 @@ def _from_keystroke(event: libevdev.InputEvent, default_threshold: int, keys_to_
 
 _last_key_up: Dict[libevdev.EventCode, int] = {}
 _key_pressed: DefaultDict[libevdev.EventCode, bool] = defaultdict(bool)
-_last_key_code = None
