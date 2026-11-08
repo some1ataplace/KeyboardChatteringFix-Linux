@@ -69,9 +69,12 @@ sudo python3 -m src.mouse_main
 ### Customization Options
 
 - `-k KEYBOARD`, `--keyboard KEYBOARD`
-  - Name of your chattering keyboard device as listed in `/dev/input/by-id`. If left unset, it will attempt to retrieve it automatically. 
+  - Name of your chattering keyboard device as listed in `/dev/input/by-id`.
+    If that directory is unavailable, automatic selection uses `/dev/input/eventN`
+    nodes instead. You can also pass an absolute event-device path such as
+    `/dev/input/event3`.
 - `-m MOUSE`, `--mouse MOUSE`
-  - Name of your double-clicking mouse device. Works identically to the keyboard argument above.
+  - Name of your double-clicking mouse device. It accepts the same device names and paths as the keyboard argument.
 - `-t THRESHOLD`, `--threshold THRESHOLD`
   - Filter time threshold in milliseconds. Default=30ms. Note: This denotes the time between a key/button being *released* and pressed again. For reference, if you click really fast, this delay is around 50 ms.
 - `-r`, `--reconnect`

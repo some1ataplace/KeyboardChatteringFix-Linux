@@ -6,7 +6,7 @@ import time
 import libevdev
 
 from src.mouse_filtering import filter_mouse_chattering
-from src.mouse_retrieval import retrieve_mouse_name, INPUT_DEVICES_PATH, abs_mouse_path
+from src.mouse_retrieval import retrieve_mouse_name, abs_mouse_path
 
 # Safely import the config file if it exists
 try:
@@ -76,7 +76,11 @@ if __name__ == "__main__":
         device_name_str = DEVICE_NAME
     else:
         logging.warning("No device specified in CLI or config. Falling back to interactive prompt.")
-        device_name_str = retrieve_mouse_name()
+        try:
+            device_name_str = retrieve_mouse_name()
+        except ValueError as error:
+            logging.critical("%s", error)
+            sys.exit(1)
 
     device_path = abs_mouse_path(device_name_str)
 
